@@ -64,7 +64,7 @@ t_shape = [(0, 0), (1, 0), (-1, 0), (0, 1)]
 shapes_map = [z_shape, s_shape, i_shape, o_shape, j_shape, l_shape, t_shape]
 
 for dot in o_shape:
-    print(tuple(np.dot(mat_rot, dot)))
+    tuple(np.dot(mat_rot, dot))
 
 
 S = [['.....',
@@ -176,27 +176,24 @@ shape_colors = [(0, 255, 0), (255, 0, 0), (0, 255, 255), (255, 255, 0), (255, 16
 
 
 class Brick(pygame.sprite.Sprite):
-    def __init__(self, x_pos, y_pos, color):
+    def __init__(self, shape, color):
         super().__init__()
         self.image = pygame.image.load('img/brick_lb.png')
         self.surface = pygame.Surface((BRICK_SIZE, BRICK_SIZE))
-        self.rect = self.surface.get_rect(center=(x_pos, y_pos))
+        print((shape[0], shape[1]))
+        self.rot_pos = (shape[0], shape[1])
+        self.rect = self.surface.get_rect(center=(shape[0] * BRICK_SIZE + 150, shape[1] * BRICK_SIZE + 150))
         self.surface.fill(WHITE)
 
-    def get_pos(self):
-        return self.rect.left, self.rect.top
-
-
-class Shape(pygame.sprite.Sprite):
-    def __init__(self):
-        super().__init__()
-        self.bricks = [Brick(brick[0]*BRICK_SIZE+100, brick[1]*BRICK_SIZE+100, WHITE) for brick in random.choice(shapes_map)]
-
     def rotate(self):
-        pressed_keys = pygame.key.get_pressed()
-        if pressed_keys[K_UP]:
-            for brick in self.bricks:
-                print(tuple(np.dot(mat_rot, dot)))
+        final_rot = np.dot(mat_rot, self.rot_pos)
+        move = (final_rot - self.rot_pos)
+        self.rot_pos = final_rot
+        self.rect.move_ip(move[0] * BRICK_SIZE, move[1] * BRICK_SIZE)
+
+
+def get_new_piece():
+    return list(Brick(brick, WHITE) for brick in (shapes_map[0]))
 
 
 class Piece(object):
@@ -229,7 +226,7 @@ def convert_shape_format(shape):
                 positions.append((shape.x + j, shape.y + i))
 
     for i, pos in enumerate(positions):
-        positions[i] = (pos[0], pos[1])
+        positions[i] = (pos[0] - 2, pos[1] - 4)
 
     return positions
 
@@ -351,7 +348,9 @@ def main(win, high_score):
     fall_speed = 0.27
     level_time = 0
     score = 0
-    shape_try = Shape()
+    active_sprites = pygame.sprite.Group()
+    new_piece = get_new_piece()
+    active_sprites.add(new_piece)
 
     while run:
         grid = create_grid(locked_positions)
@@ -391,6 +390,10 @@ def main(win, high_score):
                         current_piece.y -= 1
                 if event.key == pygame.K_UP:
                     current_piece.rotation += 1
+                    for brick in active_sprites:
+                        brick.rotate()
+
+                    print(f'END')
                     if not(valid_space(current_piece, grid)):
                         current_piece.rotation -= 1
 
@@ -413,7 +416,8 @@ def main(win, high_score):
 
         draw_window(win, grid, score)
         draw_next_shape(next_piece, win)
-        for brick in shape_try.bricks:
+
+        for brick in active_sprites:
             win.blit(brick.image, brick.rect)
         pygame.display.update()
 
@@ -427,10 +431,6 @@ def main(win, high_score):
 
 def main_menu(win):
     run = True
-    print(convert_shape_format(Piece(5, 0, S)))
-    print(convert_shape_format(Piece(5, 0, S)))
-    print(convert_shape_format(Piece(5, 0, S)))
-    print(convert_shape_format(Piece(5, 0, S)))
     while run:
         win.fill((0, 0, 0))
         #with open('scores.txt', 'r') as fl:
