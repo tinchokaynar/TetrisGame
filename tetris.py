@@ -1,5 +1,7 @@
 import pygame
+import numpy as np
 import random
+import sys
 
 # creating the data structure for pieces
 # setting up global vars
@@ -16,19 +18,54 @@ shapes: S, Z, I, O, J, L, T
 represented in order by 0 - 6
 """
 
-pygame.font.init()
+pygame.init()
 
 # GLOBALS VARS
 s_width = 800
 s_height = 700
 play_width = 300  # meaning 300 // 10 = 30 width per block
 play_height = 600  # meaning 600 // 20 = 20 height per block
-block_size = 30
+BRICK_SIZE = 30
+
+# FPS Value
+fps = 30
+frames = pygame.time.Clock()
 
 top_left_x = (s_width - play_width) // 2
 top_left_y = s_height - play_height
 
+# Colors
+BLUE = (0, 0, 255)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+
+# ROTATION MATRIX
+mat_rot = ([0, -1], [1, 0])
+
 # SHAPE FORMATS
+
+z_shape = [(0, 0), (0, -1), (1, -1), (-1, 0)]
+
+s_shape = [(0, 0), (-1, 0), (0, 1), (1, 1)]
+
+i_shape = [(0, 1), (1, 1), (-1, 1), (-2, 1)]
+
+#fixme Probar como gira el cuadrado
+o_shape = [(0, 0), (-1, 0), (-1, 1), (0, 1)]
+
+j_shape = [(0, 0), (-1, 0), (0, 1), (0, 2)]
+
+l_shape = [(0, 0), (1, 0), (0, 1), (0, 2)]
+
+t_shape = [(0, 0), (1, 0), (-1, 0), (0, 1)]
+
+shapes_map = [z_shape, s_shape, i_shape, o_shape, j_shape, l_shape, t_shape]
+
+for dot in o_shape:
+    print(tuple(np.dot(mat_rot, dot)))
+
 
 S = [['.....',
       '......',
@@ -61,6 +98,7 @@ I = [['..0..',
       '0000.',
       '.....',
       '.....',
+
       '.....']]
 
 O = [['.....',
@@ -137,6 +175,30 @@ shape_colors = [(0, 255, 0), (255, 0, 0), (0, 255, 255), (255, 255, 0), (255, 16
 # index 0 - 6 represent shape
 
 
+class Brick(pygame.sprite.Sprite):
+    def __init__(self, x_pos, y_pos, color):
+        super().__init__()
+        self.image = pygame.image.load('img/brick_lb.png')
+        self.surface = pygame.Surface((BRICK_SIZE, BRICK_SIZE))
+        self.rect = self.surface.get_rect(center=(x_pos, y_pos))
+        self.surface.fill(WHITE)
+
+    def get_pos(self):
+        return self.rect.left, self.rect.top
+
+
+class Shape(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.bricks = [Brick(brick[0]*BRICK_SIZE+100, brick[1]*BRICK_SIZE+100, WHITE) for brick in random.choice(shapes_map)]
+
+    def rotate(self):
+        pressed_keys = pygame.key.get_pressed()
+        if pressed_keys[K_UP]:
+            for brick in self.bricks:
+                print(tuple(np.dot(mat_rot, dot)))
+
+
 class Piece(object):
     def __init__(self, x, y, shape):
         self.x = x
@@ -167,7 +229,7 @@ def convert_shape_format(shape):
                 positions.append((shape.x + j, shape.y + i))
 
     for i, pos in enumerate(positions):
-        positions[i] = (pos[0] - 2, pos[1] - 4)
+        positions[i] = (pos[0], pos[1])
 
     return positions
 
@@ -176,7 +238,6 @@ def valid_space(shape, grid):
     accepted_pos = [[(j, i) for j in range(10) if grid[i][j] == (0, 0, 0)] for i in range(20)]
     accepted_pos = [j for sub in accepted_pos for j in sub]
     format_shape = convert_shape_format(shape)
-
     for pos in format_shape:
         if pos not in accepted_pos:
             if pos[1] > -1:
@@ -211,10 +272,10 @@ def draw_grid(surface, grid):
 
     for i in range(len(grid)):
         pygame.draw.line(surface, (128, 128, 128),
-                         (start_x, start_y+i*block_size), (start_x + play_width, start_y+i*block_size))
+                         (start_x, start_y+i*BRICK_SIZE), (start_x + play_width, start_y+i*BRICK_SIZE))
         for j in range(len(grid[i])):
             pygame.draw.line(surface, (128, 128, 128),
-                             (start_x + j * block_size, start_y), (start_x + j * block_size, start_y + play_height))
+                             (start_x + j * BRICK_SIZE, start_y), (start_x + j * BRICK_SIZE, start_y + play_height))
 
 
 def clear_rows(grid, locked):
@@ -251,7 +312,7 @@ def draw_next_shape(shape, surface):
         row = list(line)
         for j, column in enumerate(row):
             if column == '0':
-                pygame.draw.rect(surface, shape.color, (sx + j * block_size, sy + i*block_size, block_size, block_size))
+                pygame.draw.rect(surface, shape.color, (sx + j * BRICK_SIZE, sy + i*BRICK_SIZE, BRICK_SIZE, BRICK_SIZE))
 
     surface.blit(label, (sx + 10, sy - 20))
 
@@ -274,7 +335,7 @@ def draw_window(surface, grid, score=0):
     for i in range(len(grid)):
         for j in range(len(grid[i])):
             pygame.draw.rect(surface, grid[i][j],
-                             (top_left_x + j*block_size, top_left_y + i*block_size, block_size, block_size), 0)
+                             (top_left_x + j*BRICK_SIZE, top_left_y + i*BRICK_SIZE, BRICK_SIZE, BRICK_SIZE), 0)
 
     pygame.draw.rect(surface, (255, 0, 0), (top_left_x, top_left_y, play_width, play_height), 4)
     draw_grid(surface, grid)
@@ -286,17 +347,17 @@ def main(win, high_score):
     run = True
     current_piece = get_shape()
     next_piece = get_shape()
-    clock = pygame.time.Clock()
     fall_time = 0
     fall_speed = 0.27
     level_time = 0
     score = 0
+    shape_try = Shape()
 
     while run:
         grid = create_grid(locked_positions)
-        fall_time += clock.get_rawtime()
-        level_time += clock.get_rawtime()
-        clock.tick()
+        fall_time += frames.get_rawtime()
+        level_time += frames.get_rawtime()
+        frames.tick()
 
         if level_time/1000 > 5:
             level_time = 0
@@ -313,7 +374,8 @@ def main(win, high_score):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
-                pygame.display.quit()
+                pygame.quit()
+                sys.exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
                     current_piece.x -= 1
@@ -351,6 +413,8 @@ def main(win, high_score):
 
         draw_window(win, grid, score)
         draw_next_shape(next_piece, win)
+        for brick in shape_try.bricks:
+            win.blit(brick.image, brick.rect)
         pygame.display.update()
 
         if check_lost(locked_positions):
@@ -358,24 +422,29 @@ def main(win, high_score):
             pygame.display.update()
             pygame.time.delay(1500)
             run = False
-            update_scores(score, high_score)
+            #update_scores(score, high_score)
 
 
 def main_menu(win):
     run = True
+    print(convert_shape_format(Piece(5, 0, S)))
+    print(convert_shape_format(Piece(5, 0, S)))
+    print(convert_shape_format(Piece(5, 0, S)))
+    print(convert_shape_format(Piece(5, 0, S)))
     while run:
         win.fill((0, 0, 0))
-        with open('scores.txt', 'r') as fl:
-            lines = fl.readlines()
-            high_score = lines[0].strip()
-        draw_text_middle(win, f'Press any key to play. High Score: {high_score}', 50, (255, 255, 255))
+        #with open('scores.txt', 'r') as fl:
+        #    lines = fl.readlines()
+        #    high_score = lines[0].strip()
+        draw_text_middle(win, f'Press any key to play.', 50, (255, 255, 255))
         pygame.display.update()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
             if event.type == pygame.KEYDOWN:
-                main(win, high_score)
-    pygame.display.quit()
+                main(win, 0)
+    pygame.quit()
+    sys.exit()
 
 
 def update_scores(actual_score, score):
