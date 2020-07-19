@@ -192,12 +192,9 @@ class Brick(pygame.sprite.Sprite):
         self.rot_pos = final_rot
         self.rect.move_ip(move[0] * BRICK_SIZE, move[1] * BRICK_SIZE)
 
-    def move(self):
-        pressed_keys = pygame.key.get_pressed()
-        if pressed_keys[pygame.K_RIGHT]:
-            self.rect.move_ip(BRICK_SIZE, 0)
-        if pressed_keys[pygame.K_LEFT]:
-            self.rect.move_ip(-BRICK_SIZE, 0)
+    def move(self, mov):
+        self.rect.move_ip(mov, 0)
+
 
     def fall(self):
         self.rect.move_ip(0, BRICK_SIZE)
@@ -207,21 +204,24 @@ def get_new_piece():
     return [Brick(brick, WHITE) for brick in random.choice(shapes_map)]
 
 
-def collision(active_piece, static_bricks):
-    need_piece = False
+def collision(active_piece, static_bricks, check_side):
     for brick in active_piece:
-        if pygame.sprite.spritecollideany(brick, static_bricks, collided=collided_brick) or brick.rect.bottom >= (TOP_LEFT_Y + PLAY_HEIGHT):
-            static_bricks.add(active_piece)
-            active_piece.remove(active_piece)
-            need_piece = True
-            break
-    return need_piece
-
-
-def collided_brick(b1, b2):
-    if b1.rect.bottom == b2.rect.top and b1.rect.left == b2.rect.left:
-        return True
+        if pygame.sprite.spritecollideany(brick, static_bricks, collided=check_side):
+            return True
     return False
+
+
+def collided_brick_y(b1, b2):
+    return b1.rect.bottomleft == b2.rect.topleft or b1.rect.bottom >= (TOP_LEFT_Y + PLAY_HEIGHT)
+
+
+def collided_brick_x_left(b1, b2):
+    return b1.rect.topleft == b2.rect.topright or b1.rect.left <= TOP_LEFT_X
+
+
+def collided_brick_x_right(b1, b2):
+    return b1.rect.topright == b2.rect.topleft or b1.rect.right >= TOP_LEFT_X + PLAY_WIDTH
+
 
 class Piece(object):
     def __init__(self, x, y, shape):
@@ -323,24 +323,6 @@ def clear_rows(grid, locked):
 
     return inc
 
-
-def draw_next_shape(shape, surface):
-    font = pygame.font.SysFont('Calibri', 25)
-    label = font.render('Next Shape', 1, (255, 255, 255))
-
-    sx = TOP_LEFT_X + PLAY_WIDTH + 50
-    sy = TOP_LEFT_Y + PLAY_HEIGHT/2 - 100
-    format = shape.shape[shape.rotation % len(shape.shape)]
-
-    for i, line in enumerate(format):
-        row = list(line)
-        for j, column in enumerate(row):
-            if column == '0':
-                pygame.draw.rect(surface, shape.color, (sx + j * BRICK_SIZE, sy + i*BRICK_SIZE, BRICK_SIZE, BRICK_SIZE))
-
-    surface.blit(label, (sx + 10, sy - 20))
-
-
 def draw_window(surface, grid, score=0):
     surface.fill((0, 0, 0))
     pygame.font.init()
@@ -367,7 +349,6 @@ def draw_window(surface, grid, score=0):
 
 def main(win, high_score):
     locked_positions = {}
-    change_piece = False
     run = True
     current_piece = get_shape()
     next_piece = get_shape()
@@ -379,8 +360,10 @@ def main(win, high_score):
     static_sprites = pygame.sprite.Group()
     all_sprites = pygame.sprite.Group()
     new_piece = get_new_piece()
+    next_piece = get_new_piece()
     active_sprites.add(new_piece)
-    all_sprites.add(new_piece)
+    all_sprites.add(new_piece, next_piece)
+    static_sprites.add(next_piece)
 
     while run:
         grid = create_grid(locked_positions)
@@ -395,21 +378,18 @@ def main(win, high_score):
 
         if fall_time/1000 > fall_speed:
             fall_time = 0
-            current_piece.y += 1
-            need_piece = collision(active_sprites, static_sprites)
+            need_piece = collision(active_sprites, static_sprites, collided_brick_y)
             if need_piece:
-                piece = get_new_piece()
-                active_sprites.add(piece)
-                all_sprites.add(piece)
+                static_sprites.add(new_piece)
+                active_sprites.remove(new_piece)
+                new_piece = next_piece
+                static_sprites.remove(next_piece)
+                next_piece = get_new_piece()
+                active_sprites.add(new_piece)
+                all_sprites.add(new_piece)
             else:
                 for brick in active_sprites:
                     brick.fall()
-            if not (valid_space(current_piece, grid) and current_piece.y > 0):
-                current_piece.y -= 1
-                change_piece = True
-
-        for brick in active_sprites:
-            brick.move()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -418,43 +398,19 @@ def main(win, high_score):
                 sys.exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
-                    current_piece.x -= 1
-                    if not(valid_space(current_piece, grid)):
-                        current_piece.x += 1
+                    if not (collision(active_sprites, static_sprites, collided_brick_x_left)):
+                        for brick in active_sprites:
+                            brick.move(-BRICK_SIZE)
                 if event.key == pygame.K_RIGHT:
-                    current_piece.x += 1
-                    if not(valid_space(current_piece, grid)):
-                        current_piece.x -= 1
-                if event.key == pygame.K_DOWN:
-                    current_piece.y += 1
-                    if not(valid_space(current_piece, grid)):
-                        current_piece.y -= 1
+                    if not (collision(active_sprites, static_sprites, collided_brick_x_right)):
+                        for brick in active_sprites:
+                            brick.move(BRICK_SIZE)
+                # if event.key == pygame.K_DOWN:
                 if event.key == pygame.K_UP:
-                    current_piece.rotation += 1
                     for brick in active_sprites:
                         brick.rotate()
-                    if not(valid_space(current_piece, grid)):
-                        current_piece.rotation -= 1
-
-        shape_pos = convert_shape_format(current_piece)
-
-        for i in range(len(shape_pos)):
-            x, y = shape_pos[i]
-            if y > -1:
-                grid[y][x] = current_piece.color
-
-        if change_piece:
-            for pos in shape_pos:
-                p = (pos[0], pos[1])
-                locked_positions[p] = current_piece.color
-
-            current_piece = next_piece
-            next_piece = get_shape()
-            change_piece = False
-            score += clear_rows(grid, locked_positions) * 10
 
         draw_window(win, grid, score)
-        draw_next_shape(next_piece, win)
 
         for brick in all_sprites:
             win.blit(brick.image, brick.rect)
