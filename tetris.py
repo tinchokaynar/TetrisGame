@@ -26,13 +26,15 @@ s_height = 700
 play_width = 300  # meaning 300 // 10 = 30 width per block
 play_height = 600  # meaning 600 // 20 = 20 height per block
 BRICK_SIZE = 30
+TOP_LEFT_X = (s_width - play_width) // 2
+TOP_LEFT_Y = s_height - play_height
+START_POINT = (TOP_LEFT_X + play_width/2, TOP_LEFT_Y - 2 * BRICK_SIZE)
 
 # FPS Value
 fps = 30
 frames = pygame.time.Clock()
 
-top_left_x = (s_width - play_width) // 2
-top_left_y = s_height - play_height
+
 
 # Colors
 BLUE = (0, 0, 255)
@@ -180,9 +182,8 @@ class Brick(pygame.sprite.Sprite):
         super().__init__()
         self.image = pygame.image.load('img/brick_lb.png')
         self.surface = pygame.Surface((BRICK_SIZE, BRICK_SIZE))
-        print((shape[0], shape[1]))
         self.rot_pos = (shape[0], shape[1])
-        self.rect = self.surface.get_rect(center=(shape[0] * BRICK_SIZE + 150, shape[1] * BRICK_SIZE + 150))
+        self.rect = self.surface.get_rect(center=(shape[0] * BRICK_SIZE + START_POINT[0], shape[1] * BRICK_SIZE + START_POINT[1]))
         self.surface.fill(WHITE)
 
     def rotate(self):
@@ -191,9 +192,11 @@ class Brick(pygame.sprite.Sprite):
         self.rot_pos = final_rot
         self.rect.move_ip(move[0] * BRICK_SIZE, move[1] * BRICK_SIZE)
 
+    def fall(self):
+        self.rect.move_ip(0, BRICK_SIZE)
 
 def get_new_piece():
-    return list(Brick(brick, WHITE) for brick in (shapes_map[0]))
+    return [Brick(brick, WHITE) for brick in random.choice(shapes_map)]
 
 
 class Piece(object):
@@ -260,12 +263,12 @@ def draw_text_middle(surface, text, size, color):
     label = font.render(text, 1, color)
 
     surface.blit(label,
-                 (top_left_x + play_width/2 - (label.get_width()/2), top_left_y + play_height/2 - label.get_height()/2))
+                 (TOP_LEFT_X + play_width/2 - (label.get_width()/2), TOP_LEFT_Y + play_height/2 - label.get_height()/2))
 
 
 def draw_grid(surface, grid):
-    start_x = top_left_x
-    start_y = top_left_y
+    start_x = TOP_LEFT_X
+    start_y = TOP_LEFT_Y
 
     for i in range(len(grid)):
         pygame.draw.line(surface, (128, 128, 128),
@@ -301,8 +304,8 @@ def draw_next_shape(shape, surface):
     font = pygame.font.SysFont('Calibri', 25)
     label = font.render('Next Shape', 1, (255, 255, 255))
 
-    sx = top_left_x + play_width + 50
-    sy = top_left_y + play_height/2 - 100
+    sx = TOP_LEFT_X + play_width + 50
+    sy = TOP_LEFT_Y + play_height/2 - 100
     format = shape.shape[shape.rotation % len(shape.shape)]
 
     for i, line in enumerate(format):
@@ -319,22 +322,22 @@ def draw_window(surface, grid, score=0):
     pygame.font.init()
     font = pygame.font.SysFont('Calibri', 50)
     label = font.render('Tetris', 1, (255, 255, 255))
-    surface.blit(label, (top_left_x + play_width / 2 - (label.get_width() / 2), 30))
+    surface.blit(label, (TOP_LEFT_X + play_width / 2 - (label.get_width() / 2), 30))
 
     font = pygame.font.SysFont('Calibri', 25)
     label = font.render(f'Score: {score}', 1, (255, 255, 255))
 
-    sx = top_left_x + play_width + 50
-    sy = top_left_y + play_height/2 - 100
+    sx = TOP_LEFT_X + play_width + 50
+    sy = TOP_LEFT_Y + play_height/2 - 100
 
     surface.blit(label, (sx + 10, sy + 200))
 
     for i in range(len(grid)):
         for j in range(len(grid[i])):
             pygame.draw.rect(surface, grid[i][j],
-                             (top_left_x + j*BRICK_SIZE, top_left_y + i*BRICK_SIZE, BRICK_SIZE, BRICK_SIZE), 0)
+                             (TOP_LEFT_X + j*BRICK_SIZE, TOP_LEFT_Y + i*BRICK_SIZE, BRICK_SIZE, BRICK_SIZE), 0)
 
-    pygame.draw.rect(surface, (255, 0, 0), (top_left_x, top_left_y, play_width, play_height), 4)
+    pygame.draw.rect(surface, (255, 0, 0), (TOP_LEFT_X, TOP_LEFT_Y, play_width, play_height), 4)
     draw_grid(surface, grid)
 
 
@@ -366,6 +369,8 @@ def main(win, high_score):
         if fall_time/1000 > fall_speed:
             fall_time = 0
             current_piece.y += 1
+            for brick in active_sprites:
+                brick.fall()
             if not (valid_space(current_piece, grid) and current_piece.y > 0):
                 current_piece.y -= 1
                 change_piece = True
@@ -392,8 +397,6 @@ def main(win, high_score):
                     current_piece.rotation += 1
                     for brick in active_sprites:
                         brick.rotate()
-
-                    print(f'END')
                     if not(valid_space(current_piece, grid)):
                         current_piece.rotation -= 1
 
