@@ -178,12 +178,12 @@ shape_colors = [(0, 255, 0), (255, 0, 0), (0, 255, 255), (255, 255, 0), (255, 16
 
 
 class Brick(pygame.sprite.Sprite):
-    def __init__(self, shape, color):
+    def __init__(self, shape, color, pos=(0, 0)):
         super().__init__()
         self.image = pygame.transform.scale(pygame.image.load('img/brick_lb.png'), (BRICK_SIZE, BRICK_SIZE))
         self.surface = pygame.Surface((BRICK_SIZE, BRICK_SIZE))
         self.rot_pos = (shape[0], shape[1])
-        self.rect = self.surface.get_rect(topleft=(shape[0] * BRICK_SIZE + START_POINT[0], shape[1] * BRICK_SIZE + START_POINT[1]))
+        self.rect = self.surface.get_rect(topleft=(shape[0] * BRICK_SIZE + START_POINT[0] + pos[0], shape[1] * BRICK_SIZE + START_POINT[1] + pos[1]))
         self.surface.fill(WHITE)
 
     def rotate(self):
@@ -200,8 +200,8 @@ class Brick(pygame.sprite.Sprite):
         self.rect.move_ip(0, BRICK_SIZE)
 
 
-def get_new_piece():
-    return [Brick(brick, WHITE) for brick in random.choice(shapes_map)]
+def get_new_piece(pos=(0, 0)):
+    return [Brick(brick, WHITE, pos) for brick in random.choice(shapes_map)]
 
 
 def collision(active_piece, static_bricks, check_side):
@@ -347,6 +347,22 @@ def draw_window(surface, grid, score=0):
     draw_grid(surface, grid)
 
 
+def change_piece(active_sprites, static_sprites, all_sprites, next_sprites):
+    static_sprites.add(active_sprites.sprites())
+    active_sprites.empty()
+
+    next_piece = next_sprites.sprites()
+    for b in next_piece:
+        b.rect.move_ip(-250, -150)
+    static_sprites.remove(next_piece)
+    active_sprites.add(next_piece)
+    next_sprites.empty()
+
+    new_piece = get_new_piece(pos=(250, 150))
+    next_sprites.add(new_piece)
+    all_sprites.add(new_piece)
+
+
 def main(win, high_score):
     locked_positions = {}
     run = True
@@ -356,14 +372,20 @@ def main(win, high_score):
     fall_speed = 0.27
     level_time = 0
     score = 0
+
     active_sprites = pygame.sprite.Group()
     static_sprites = pygame.sprite.Group()
+    next_sprites = pygame.sprite.Group()
     all_sprites = pygame.sprite.Group()
-    new_piece = get_new_piece()
-    next_piece = get_new_piece()
-    active_sprites.add(new_piece)
-    all_sprites.add(new_piece, next_piece)
+
+    current_piece = get_new_piece()
+    active_sprites.add(current_piece)
+
+    next_piece = get_new_piece(pos=(+250, +150))
+    next_sprites.add(next_piece)
     static_sprites.add(next_piece)
+
+    all_sprites.add(current_piece, next_piece)
 
     while run:
         grid = create_grid(locked_positions)
@@ -380,13 +402,7 @@ def main(win, high_score):
             fall_time = 0
             need_piece = collision(active_sprites, static_sprites, collided_brick_y)
             if need_piece:
-                static_sprites.add(new_piece)
-                active_sprites.remove(new_piece)
-                new_piece = next_piece
-                static_sprites.remove(next_piece)
-                next_piece = get_new_piece()
-                active_sprites.add(new_piece)
-                all_sprites.add(new_piece)
+                change_piece(active_sprites, static_sprites, all_sprites, next_sprites)
             else:
                 for brick in active_sprites:
                     brick.fall()
