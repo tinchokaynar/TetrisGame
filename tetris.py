@@ -195,7 +195,6 @@ class Brick(pygame.sprite.Sprite):
     def move(self, mov):
         self.rect.move_ip(mov, 0)
 
-
     def fall(self):
         self.rect.move_ip(0, BRICK_SIZE)
 
@@ -205,10 +204,7 @@ def get_new_piece(pos=(0, 0)):
 
 
 def collision(active_piece, static_bricks, check_side):
-    for brick in active_piece:
-        if pygame.sprite.spritecollideany(brick, static_bricks, collided=check_side):
-            return True
-    return False
+    return pygame.sprite.groupcollide(active_piece, static_bricks, False, False, collided=check_side)
 
 
 def collided_brick_y(b1, b2):
@@ -290,18 +286,6 @@ def draw_text_middle(surface, text, size, color):
                  (TOP_LEFT_X + PLAY_WIDTH/2 - (label.get_width()/2), TOP_LEFT_Y + PLAY_HEIGHT/2 - label.get_height()/2))
 
 
-def draw_grid(surface, grid):
-    start_x = TOP_LEFT_X
-    start_y = TOP_LEFT_Y
-
-    for i in range(len(grid)):
-        pygame.draw.line(surface, (128, 128, 128),
-                         (start_x, start_y+i*BRICK_SIZE), (start_x + PLAY_WIDTH, start_y+i*BRICK_SIZE))
-        for j in range(len(grid[i])):
-            pygame.draw.line(surface, (128, 128, 128),
-                             (start_x + j * BRICK_SIZE, start_y), (start_x + j * BRICK_SIZE, start_y + PLAY_HEIGHT))
-
-
 def clear_rows(grid, locked):
     inc = 0
     for i in range(len(grid)-1, -1, -1):
@@ -322,6 +306,7 @@ def clear_rows(grid, locked):
                 locked[new_key] = locked.pop(key)
 
     return inc
+
 
 def draw_window(surface, grid, score=0):
     surface.fill((0, 0, 0))
@@ -344,7 +329,6 @@ def draw_window(surface, grid, score=0):
     #                         (TOP_LEFT_X + j*BRICK_SIZE, TOP_LEFT_Y + i*BRICK_SIZE, BRICK_SIZE, BRICK_SIZE), 0)
     #
     #pygame.draw.rect(surface, (255, 0, 0), (TOP_LEFT_X, TOP_LEFT_Y, PLAY_WIDTH, PLAY_HEIGHT), 4)
-    draw_grid(surface, grid)
 
 
 def change_piece(active_sprites, static_sprites, all_sprites, next_sprites):
@@ -361,6 +345,27 @@ def change_piece(active_sprites, static_sprites, all_sprites, next_sprites):
     new_piece = get_new_piece(pos=(250, 150))
     next_sprites.add(new_piece)
     all_sprites.add(new_piece)
+
+
+def rotate_piece(active_bricks, static_bricks, i=1):
+    if i > 4:
+        return
+
+    for brick in active_bricks:
+        brick.rotate()
+
+    if pygame.sprite.groupcollide(active_bricks, static_bricks, False, False) or check_invalid_terrain(active_bricks):
+        rotate_piece(active_bricks, static_bricks, i + 1)
+    else:
+        return
+
+
+def check_invalid_terrain(active_bricks):
+    for brick in active_bricks:
+        if brick.rect.left < TOP_LEFT_X or brick.rect.right > TOP_LEFT_X + PLAY_WIDTH:
+            return True
+
+    return False
 
 
 def main(win, high_score):
@@ -423,8 +428,7 @@ def main(win, high_score):
                             brick.move(BRICK_SIZE)
                 # if event.key == pygame.K_DOWN:
                 if event.key == pygame.K_UP:
-                    for brick in active_sprites:
-                        brick.rotate()
+                    rotate_piece(active_sprites, static_sprites)
 
         draw_window(win, grid, score)
 
