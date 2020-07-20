@@ -3,19 +3,9 @@ import numpy as np
 import random
 import sys
 
-# creating the data structure for pieces
-# setting up global vars
-# functions
-# - create_grid
-# - draw_grid
-# - draw_window
-# - rotating shape in main
-# - setting up the main
-
 """
 10 x 20 square grid
 shapes: S, Z, I, O, J, L, T
-represented in order by 0 - 6
 """
 
 pygame.init()
@@ -24,8 +14,8 @@ pygame.init()
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 700
 PLAY_WIDTH = 300  # meaning 300 // 10 = 30 width per block
-PLAY_HEIGHT = 600  # meaning 600 // 20 = 20 height per block
-BRICK_SIZE = 30
+PLAY_HEIGHT = int(PLAY_WIDTH * 2)  # meaning 600 // 20 = 20 height per block
+BRICK_SIZE = int(PLAY_WIDTH/10)  # or PLAY_HEIGHT/20
 TOP_LEFT_X = (SCREEN_WIDTH - PLAY_WIDTH) // 2
 TOP_LEFT_Y = SCREEN_HEIGHT - PLAY_HEIGHT
 START_POINT = (TOP_LEFT_X + PLAY_WIDTH/2, TOP_LEFT_Y - 2 * BRICK_SIZE)
@@ -33,8 +23,6 @@ START_POINT = (TOP_LEFT_X + PLAY_WIDTH/2, TOP_LEFT_Y - 2 * BRICK_SIZE)
 # FPS Value
 fps = 30
 frames = pygame.time.Clock()
-
-
 
 # Colors
 BLUE = (0, 0, 255)
@@ -46,8 +34,7 @@ WHITE = (255, 255, 255)
 # ROTATION MATRIX
 mat_rot = ([0, -1], [1, 0])
 
-# SHAPE FORMATS
-
+# SHAPES
 z_shape = [(0, 0), (0, -1), (1, -1), (-1, 0)]
 
 s_shape = [(0, 0), (-1, 0), (0, 1), (1, 1)]
@@ -64,117 +51,6 @@ l_shape = [(0, 0), (1, 0), (0, 1), (0, 2)]
 t_shape = [(0, 0), (1, 0), (-1, 0), (0, 1)]
 
 shapes_map = [z_shape, s_shape, i_shape, o_shape, j_shape, l_shape, t_shape]
-
-for dot in o_shape:
-    tuple(np.dot(mat_rot, dot))
-
-
-S = [['.....',
-      '......',
-      '..00..',
-      '.00...',
-      '.....'],
-     ['.....',
-      '..0..',
-      '..00.',
-      '...0.',
-      '.....']]
-
-Z = [['.....',
-      '.....',
-      '.00..',
-      '..00.',
-      '.....'],
-     ['.....',
-      '..0..',
-      '.00..',
-      '.0...',
-      '.....']]
-
-I = [['..0..',
-      '..0..',
-      '..0..',
-      '..0..',
-      '.....'],
-     ['.....',
-      '0000.',
-      '.....',
-      '.....',
-
-      '.....']]
-
-O = [['.....',
-      '.....',
-      '.00..',
-      '.00..',
-      '.....']]
-
-J = [['.....',
-      '.0...',
-      '.000.',
-      '.....',
-      '.....'],
-     ['.....',
-      '..00.',
-      '..0..',
-      '..0..',
-      '.....'],
-     ['.....',
-      '.....',
-      '.000.',
-      '...0.',
-      '.....'],
-     ['.....',
-      '..0..',
-      '..0..',
-      '.00..',
-      '.....']]
-
-L = [['.....',
-      '...0.',
-      '.000.',
-      '.....',
-      '.....'],
-     ['.....',
-      '..0..',
-      '..0..',
-      '..00.',
-      '.....'],
-     ['.....',
-      '.....',
-      '.000.',
-      '.0...',
-      '.....'],
-     ['.....',
-      '.00..',
-      '..0..',
-      '..0..',
-      '.....']]
-
-T = [['.....',
-      '..0..',
-      '.000.',
-      '.....',
-      '.....'],
-     ['.....',
-      '..0..',
-      '..00.',
-      '..0..',
-      '.....'],
-     ['.....',
-      '.....',
-      '.000.',
-      '..0..',
-      '.....'],
-     ['.....',
-      '..0..',
-      '.00..',
-      '..0..',
-      '.....']]
-
-shapes = [S, Z, I, O, J, L, T]
-shape_colors = [(0, 255, 0), (255, 0, 0), (0, 255, 255), (255, 255, 0), (255, 165, 0), (0, 0, 255), (128, 0, 128)]
-# index 0 - 6 represent shape
 
 
 class Brick(pygame.sprite.Sprite):
@@ -219,15 +95,6 @@ def collided_brick_x_right(b1, b2):
     return b1.rect.topright == b2.rect.topleft or b1.rect.right >= TOP_LEFT_X + PLAY_WIDTH
 
 
-class Piece(object):
-    def __init__(self, x, y, shape):
-        self.x = x
-        self.y = y
-        self.shape = shape
-        self.color = shape_colors[shapes.index(shape)]
-        self.rotation = 0
-
-
 def create_grid(locked_positions={}):
     grid = [[(0, 0, 0) for _ in range(10)] for _ in range(20)]
     for i in range(len(grid)):
@@ -236,33 +103,6 @@ def create_grid(locked_positions={}):
                 c = locked_positions[(j, i)]
                 grid[i][j] = c
     return grid
-
-
-def convert_shape_format(shape):
-    positions = []
-    format = shape.shape[shape.rotation % len(shape.shape)]
-
-    for i, line in enumerate(format):
-        row = list(line)
-        for j, column in enumerate(row):
-            if column == '0':
-                positions.append((shape.x + j, shape.y + i))
-
-    for i, pos in enumerate(positions):
-        positions[i] = (pos[0] - 2, pos[1] - 4)
-
-    return positions
-
-
-def valid_space(shape, grid):
-    accepted_pos = [[(j, i) for j in range(10) if grid[i][j] == (0, 0, 0)] for i in range(20)]
-    accepted_pos = [j for sub in accepted_pos for j in sub]
-    format_shape = convert_shape_format(shape)
-    for pos in format_shape:
-        if pos not in accepted_pos:
-            if pos[1] > -1:
-                return False
-    return True
 
 
 def check_lost(positions):
@@ -274,10 +114,6 @@ def check_lost(positions):
     return False
 
 
-def get_shape():
-    return Piece(5, 0, random.choice(shapes))
-
-
 def draw_text_middle(surface, text, size, color):
     font = pygame.font.SysFont('Calibri', size, italic=True)
     label = font.render(text, 1, color)
@@ -286,30 +122,9 @@ def draw_text_middle(surface, text, size, color):
                  (TOP_LEFT_X + PLAY_WIDTH/2 - (label.get_width()/2), TOP_LEFT_Y + PLAY_HEIGHT/2 - label.get_height()/2))
 
 
-def clear_rows(grid, locked):
-    inc = 0
-    for i in range(len(grid)-1, -1, -1):
-        row = grid[i]
-        if(0, 0, 0) not in row:
-            inc += 1
-            ind = i
-            for j in range(len(row)):
-                try:
-                    del locked[(j, i)]
-                except:
-                    continue
-    if inc > 0:
-        for key in sorted(list(locked), key=lambda x: x[1])[::-1]:
-            x, y = key
-            if y < ind:
-                new_key = (x, y + inc)
-                locked[new_key] = locked.pop(key)
 
-    return inc
-
-
-def draw_window(surface, grid, score=0):
-    surface.fill((0, 0, 0))
+def draw_window(surface, score=0):
+    surface.fill(WHITE)
     pygame.font.init()
     font = pygame.font.SysFont('Calibri', 50)
     label = font.render('Tetris', 1, (255, 255, 255))
@@ -323,12 +138,7 @@ def draw_window(surface, grid, score=0):
 
     surface.blit(label, (sx + 10, sy + 200))
 
-    #for i in range(len(grid)):
-    #    for j in range(len(grid[i])):
-    #        pygame.draw.rect(surface, grid[i][j],
-    #                         (TOP_LEFT_X + j*BRICK_SIZE, TOP_LEFT_Y + i*BRICK_SIZE, BRICK_SIZE, BRICK_SIZE), 0)
-    #
-    #pygame.draw.rect(surface, (255, 0, 0), (TOP_LEFT_X, TOP_LEFT_Y, PLAY_WIDTH, PLAY_HEIGHT), 4)
+    pygame.draw.rect(surface, (255, 0, 0), (TOP_LEFT_X, TOP_LEFT_Y, PLAY_WIDTH, PLAY_HEIGHT), 4)
 
 
 def change_piece(active_sprites, static_sprites, all_sprites, next_sprites):
@@ -368,11 +178,29 @@ def check_invalid_terrain(active_bricks):
     return False
 
 
+def check_lines(static_bricks):
+    lines = False
+    last_line = False
+    sorted_bricks = sorted(static_bricks, key=lambda b: b.rect.top)
+    for i in range(sorted_bricks[0].rect.top, TOP_LEFT_Y + PLAY_HEIGHT, BRICK_SIZE):
+        bricks_in_same_y = list(filter(lambda b: b.rect.top == i, sorted_bricks))
+        if len(bricks_in_same_y) >= PLAY_WIDTH / BRICK_SIZE:
+            lines += 1
+            last_line = i
+            for b in bricks_in_same_y:
+                b.kill()
+
+    if lines:
+        bricks_floating = list(filter(lambda b: b.rect.top < last_line, static_bricks))
+        for b_float in bricks_floating:
+            b_float.rect.move_ip(0, BRICK_SIZE*lines)
+
+    return lines
+
+
 def main(win, high_score):
     locked_positions = {}
     run = True
-    current_piece = get_shape()
-    next_piece = get_shape()
     fall_time = 0
     fall_speed = 0.27
     level_time = 0
@@ -393,7 +221,6 @@ def main(win, high_score):
     all_sprites.add(current_piece, next_piece)
 
     while run:
-        grid = create_grid(locked_positions)
         fall_time += frames.get_rawtime()
         level_time += frames.get_rawtime()
         frames.tick()
@@ -430,10 +257,10 @@ def main(win, high_score):
                 if event.key == pygame.K_UP:
                     rotate_piece(active_sprites, static_sprites)
 
-        draw_window(win, grid, score)
+        draw_window(win, score)
 
-        for brick in all_sprites:
-            win.blit(brick.image, brick.rect)
+        check_lines(static_sprites)
+        all_sprites.draw(win)
         pygame.display.update()
 
         if check_lost(locked_positions):
