@@ -17,9 +17,10 @@ PLAY_WIDTH = 300  # meaning 300 // 10 = 30 width per block
 PLAY_HEIGHT = int(PLAY_WIDTH * 2)  # meaning 600 // 20 = 20 height per block
 BRICK_SIZE = int(PLAY_WIDTH/10)  # or PLAY_HEIGHT/20
 TOP_LEFT_X = (SCREEN_WIDTH - PLAY_WIDTH) // 2
-TOP_LEFT_Y = SCREEN_HEIGHT - PLAY_HEIGHT
+TOP_LEFT_Y = SCREEN_HEIGHT - PLAY_HEIGHT - 50
 START_POINT = (TOP_LEFT_X + PLAY_WIDTH/2, TOP_LEFT_Y - 2 * BRICK_SIZE)
-
+DISPLAY_INFO_START = (TOP_LEFT_X + PLAY_WIDTH + 50, TOP_LEFT_Y + 50)
+print(DISPLAY_INFO_START)
 # FPS Value
 fps = 30
 frames = pygame.time.Clock()
@@ -52,11 +53,14 @@ t_shape = [(0, 0), (1, 0), (-1, 0), (0, 1)]
 
 shapes_map = [z_shape, s_shape, i_shape, o_shape, j_shape, l_shape, t_shape]
 
+# POINTS
+points = [40, 100, 300, 1200]
+
 
 class Brick(pygame.sprite.Sprite):
     def __init__(self, shape, color, pos=(0, 0)):
         super().__init__()
-        self.image = pygame.transform.scale(pygame.image.load('img/brick_lb.png'), (BRICK_SIZE, BRICK_SIZE))
+        self.image = pygame.transform.scale(pygame.image.load('img/bl_red.jpg'), (BRICK_SIZE, BRICK_SIZE))
         self.surface = pygame.Surface((BRICK_SIZE, BRICK_SIZE))
         self.rot_pos = (shape[0], shape[1])
         self.rect = self.surface.get_rect(topleft=(shape[0] * BRICK_SIZE + START_POINT[0] + pos[0], shape[1] * BRICK_SIZE + START_POINT[1] + pos[1]))
@@ -73,6 +77,23 @@ class Brick(pygame.sprite.Sprite):
 
     def fall(self):
         self.rect.move_ip(0, BRICK_SIZE)
+
+
+class Background(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.transform.scale(pygame.image.load('img/bg.jpg'), (SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.rect = self.surface.get_rect(topleft=(0, 0))
+        self.surface.fill(WHITE)
+
+
+class Playfield(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.transform.scale(pygame.transform.rotate(pygame.image.load('img/play3.png'), 90), (PLAY_WIDTH + 55, PLAY_HEIGHT + 52))
+        self.surface = pygame.Surface((PLAY_WIDTH + 55, PLAY_HEIGHT + 52))
+        self.rect = self.surface.get_rect(topleft=(TOP_LEFT_X - 27, TOP_LEFT_Y - 20))
 
 
 def get_new_piece(pos=(0, 0)):
@@ -122,23 +143,16 @@ def draw_text_middle(surface, text, size, color):
                  (TOP_LEFT_X + PLAY_WIDTH/2 - (label.get_width()/2), TOP_LEFT_Y + PLAY_HEIGHT/2 - label.get_height()/2))
 
 
-
 def draw_window(surface, score=0):
-    surface.fill(WHITE)
+    surface.fill(BLACK)
     pygame.font.init()
-    font = pygame.font.SysFont('Calibri', 50)
-    label = font.render('Tetris', 1, (255, 255, 255))
-    surface.blit(label, (TOP_LEFT_X + PLAY_WIDTH / 2 - (label.get_width() / 2), 30))
 
-    font = pygame.font.SysFont('Calibri', 25)
-    label = font.render(f'Score: {score}', 1, (255, 255, 255))
+    font = pygame.font.Font('font/Tetris.ttf', 25)
+    label_score = font.render(f'Score: {score}', 1, (255, 255, 255))
+    label_next = font.render('Next Piece', 1, (255, 255, 255))
 
-    sx = TOP_LEFT_X + PLAY_WIDTH + 50
-    sy = TOP_LEFT_Y + PLAY_HEIGHT/2 - 100
-
-    surface.blit(label, (sx + 10, sy + 200))
-
-    pygame.draw.rect(surface, (255, 0, 0), (TOP_LEFT_X, TOP_LEFT_Y, PLAY_WIDTH, PLAY_HEIGHT), 4)
+    surface.blit(label_score, (DISPLAY_INFO_START[0], DISPLAY_INFO_START[1] + ((TOP_LEFT_Y+PLAY_HEIGHT)*0.50)))
+    surface.blit(label_next, DISPLAY_INFO_START)
 
 
 def change_piece(active_sprites, static_sprites, all_sprites, next_sprites):
@@ -147,12 +161,12 @@ def change_piece(active_sprites, static_sprites, all_sprites, next_sprites):
 
     next_piece = next_sprites.sprites()
     for b in next_piece:
-        b.rect.move_ip(-250, -150)
+        b.rect.move_ip((-DISPLAY_INFO_START[0] + START_POINT[0] - 60, -DISPLAY_INFO_START[1] + START_POINT[1] - 25))
     static_sprites.remove(next_piece)
     active_sprites.add(next_piece)
     next_sprites.empty()
 
-    new_piece = get_new_piece(pos=(250, 150))
+    new_piece = get_new_piece(pos=(DISPLAY_INFO_START[0] - START_POINT[0] + 60, DISPLAY_INFO_START[1] - START_POINT[1] + 25))
     next_sprites.add(new_piece)
     all_sprites.add(new_piece)
 
@@ -170,6 +184,10 @@ def rotate_piece(active_bricks, static_bricks, i=1):
         return
 
 
+def soft_drop(active_bricks, static_bricks):
+    pass
+
+
 def check_invalid_terrain(active_bricks):
     for brick in active_bricks:
         if brick.rect.left < TOP_LEFT_X or brick.rect.right > TOP_LEFT_X + PLAY_WIDTH:
@@ -181,6 +199,7 @@ def check_invalid_terrain(active_bricks):
 def check_lines(static_bricks):
     lines = False
     last_line = False
+    total_points = 0
     sorted_bricks = sorted(static_bricks, key=lambda b: b.rect.top)
     for i in range(sorted_bricks[0].rect.top, TOP_LEFT_Y + PLAY_HEIGHT, BRICK_SIZE):
         bricks_in_same_y = list(filter(lambda b: b.rect.top == i, sorted_bricks))
@@ -191,11 +210,12 @@ def check_lines(static_bricks):
                 b.kill()
 
     if lines:
+        total_points = points[lines-1]
         bricks_floating = list(filter(lambda b: b.rect.top < last_line, static_bricks))
         for b_float in bricks_floating:
             b_float.rect.move_ip(0, BRICK_SIZE*lines)
 
-    return lines
+    return total_points
 
 
 def main(win, high_score):
@@ -206,6 +226,8 @@ def main(win, high_score):
     level_time = 0
     score = 0
 
+    playfield = Playfield()
+
     active_sprites = pygame.sprite.Group()
     static_sprites = pygame.sprite.Group()
     next_sprites = pygame.sprite.Group()
@@ -214,7 +236,7 @@ def main(win, high_score):
     current_piece = get_new_piece()
     active_sprites.add(current_piece)
 
-    next_piece = get_new_piece(pos=(+250, +150))
+    next_piece = get_new_piece(pos=(DISPLAY_INFO_START[0] - START_POINT[0] + 60, DISPLAY_INFO_START[1] - START_POINT[1] + 25))
     next_sprites.add(next_piece)
     static_sprites.add(next_piece)
 
@@ -235,6 +257,7 @@ def main(win, high_score):
             need_piece = collision(active_sprites, static_sprites, collided_brick_y)
             if need_piece:
                 change_piece(active_sprites, static_sprites, all_sprites, next_sprites)
+                score += check_lines(static_sprites)
             else:
                 for brick in active_sprites:
                     brick.fall()
@@ -253,13 +276,14 @@ def main(win, high_score):
                     if not (collision(active_sprites, static_sprites, collided_brick_x_right)):
                         for brick in active_sprites:
                             brick.move(BRICK_SIZE)
-                # if event.key == pygame.K_DOWN:
+                if event.key == pygame.K_DOWN:
+                    soft_drop(active_sprites, static_sprites)
                 if event.key == pygame.K_UP:
                     rotate_piece(active_sprites, static_sprites)
 
         draw_window(win, score)
+        win.blit(playfield.image, playfield.rect)
 
-        check_lines(static_sprites)
         all_sprites.draw(win)
         pygame.display.update()
 
@@ -275,6 +299,8 @@ def main_menu(win):
     run = True
     while run:
         win.fill((0, 0, 0))
+        bg = Background()
+        win.blit(bg.image, bg.rect)
         #with open('scores.txt', 'r') as fl:
         #    lines = fl.readlines()
         #    high_score = lines[0].strip()
