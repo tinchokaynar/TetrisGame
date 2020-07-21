@@ -20,9 +20,9 @@ TOP_LEFT_X = (SCREEN_WIDTH - PLAY_WIDTH) // 2
 TOP_LEFT_Y = SCREEN_HEIGHT - PLAY_HEIGHT - 50
 START_POINT = (TOP_LEFT_X + PLAY_WIDTH/2, TOP_LEFT_Y - 2 * BRICK_SIZE)
 DISPLAY_INFO_START = (TOP_LEFT_X + PLAY_WIDTH + 50, TOP_LEFT_Y + 50)
-print(DISPLAY_INFO_START)
+
 # FPS Value
-fps = 30
+fps = 60
 frames = pygame.time.Clock()
 
 # Colors
@@ -72,11 +72,8 @@ class Brick(pygame.sprite.Sprite):
         self.rot_pos = final_rot
         self.rect.move_ip(move[0] * BRICK_SIZE, move[1] * BRICK_SIZE)
 
-    def move(self, mov):
-        self.rect.move_ip(mov, 0)
-
-    def fall(self):
-        self.rect.move_ip(0, BRICK_SIZE)
+    def move(self, movx, movy):
+        self.rect.move_ip(movx, movy)
 
 
 class Background(pygame.sprite.Sprite):
@@ -161,7 +158,7 @@ def change_piece(active_sprites, static_sprites, all_sprites, next_sprites):
 
     next_piece = next_sprites.sprites()
     for b in next_piece:
-        b.rect.move_ip((-DISPLAY_INFO_START[0] + START_POINT[0] - 60, -DISPLAY_INFO_START[1] + START_POINT[1] - 25))
+        b.move(-DISPLAY_INFO_START[0] + START_POINT[0] - 60, -DISPLAY_INFO_START[1] + START_POINT[1] - 25)
     static_sprites.remove(next_piece)
     active_sprites.add(next_piece)
     next_sprites.empty()
@@ -184,8 +181,38 @@ def rotate_piece(active_bricks, static_bricks, i=1):
         return
 
 
-def soft_drop(active_bricks, static_bricks):
-    pass
+def soft_drop(active_bricks):
+    for b in active_bricks:
+        b.move(0, BRICK_SIZE)
+
+
+def hard_drop(active_bricks, static_bricks):
+    left_pos_active = dict()
+    for b in active_bricks:
+        if not(b.rect.left in left_pos_active):
+            left_pos_active[b.rect.left] = b.rect.bottom
+        elif left_pos_active[b.rect.left] < b.rect.bottom:
+            left_pos_active[b.rect.left] = b.rect.bottom
+
+    left_pos_static = dict()
+    for b in static_bricks:
+        if not(b.rect.left in left_pos_static):
+            left_pos_static[b.rect.left] = b.rect.top
+        elif left_pos_static[b.rect.left] > b.rect.top:
+            left_pos_static[b.rect.left] = b.rect.top
+
+    diff_vector = []
+    for active in left_pos_active:
+        if active in left_pos_static:
+            diff_vector.append(left_pos_static[active] - left_pos_active[active])
+        else:
+            diff_vector.append(TOP_LEFT_Y + PLAY_HEIGHT - left_pos_active[active])
+
+    drop = min(diff_vector)
+    for b in active_bricks:
+        b.move(0, drop)
+
+    return int(drop/BRICK_SIZE)
 
 
 def check_invalid_terrain(active_bricks):
@@ -213,13 +240,12 @@ def check_lines(static_bricks):
         total_points = points[lines-1]
         bricks_floating = list(filter(lambda b: b.rect.top < last_line, static_bricks))
         for b_float in bricks_floating:
-            b_float.rect.move_ip(0, BRICK_SIZE*lines)
+            b_float.move(0, BRICK_SIZE*lines)
 
     return total_points
 
 
 def main(win, high_score):
-    locked_positions = {}
     run = True
     fall_time = 0
     fall_speed = 0.27
@@ -242,25 +268,18 @@ def main(win, high_score):
 
     all_sprites.add(current_piece, next_piece)
 
+    soft_drop_active = False
+
     while run:
+
         fall_time += frames.get_rawtime()
         level_time += frames.get_rawtime()
-        frames.tick()
+        frames.tick(fps)
 
         if level_time/1000 > 5:
             level_time = 0
             if fall_speed > 0.12:
                 fall_speed -= 0.01
-
-        if fall_time/1000 > fall_speed:
-            fall_time = 0
-            need_piece = collision(active_sprites, static_sprites, collided_brick_y)
-            if need_piece:
-                change_piece(active_sprites, static_sprites, all_sprites, next_sprites)
-                score += check_lines(static_sprites)
-            else:
-                for brick in active_sprites:
-                    brick.fall()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -271,28 +290,41 @@ def main(win, high_score):
                 if event.key == pygame.K_LEFT:
                     if not (collision(active_sprites, static_sprites, collided_brick_x_left)):
                         for brick in active_sprites:
-                            brick.move(-BRICK_SIZE)
+                            brick.move(-BRICK_SIZE, 0)
                 if event.key == pygame.K_RIGHT:
                     if not (collision(active_sprites, static_sprites, collided_brick_x_right)):
                         for brick in active_sprites:
-                            brick.move(BRICK_SIZE)
+                            brick.move(BRICK_SIZE, 0)
                 if event.key == pygame.K_DOWN:
-                    soft_drop(active_sprites, static_sprites)
+                    soft_drop_active = True
                 if event.key == pygame.K_UP:
                     rotate_piece(active_sprites, static_sprites)
+                if event.key == pygame.K_SPACE:
+                    droped_lines = hard_drop(active_sprites, static_sprites)
+                    score += droped_lines * 2
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_DOWN:
+                    soft_drop_active = False
+
+        if soft_drop_active:
+            if not (collision(active_sprites, static_sprites, collided_brick_y)):
+                soft_drop(active_sprites)
+                score += 1
+
+        if fall_time/1000 > fall_speed:
+            fall_time = 0
+            need_piece = collision(active_sprites, static_sprites, collided_brick_y)
+            if need_piece:
+                change_piece(active_sprites, static_sprites, all_sprites, next_sprites)
+                score += check_lines(static_sprites)
+            else:
+                soft_drop(active_sprites)
 
         draw_window(win, score)
         win.blit(playfield.image, playfield.rect)
 
         all_sprites.draw(win)
         pygame.display.update()
-
-        if check_lost(locked_positions):
-            draw_text_middle(win, f'You Lost! Score: {score}', 75, (255, 255, 255))
-            pygame.display.update()
-            pygame.time.delay(1500)
-            run = False
-            #update_scores(score, high_score)
 
 
 def main_menu(win):
