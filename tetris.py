@@ -76,6 +76,78 @@ class Brick(pygame.sprite.Sprite):
         self.rect.move_ip(movx, movy)
 
 
+class Piece(pygame.sprite.Group):
+    def __init__(self, pos=(0, 0)):
+        super().__init__()
+        self.add([Brick(brick, WHITE, pos) for brick in random.choice(shapes_map)])
+
+    def collision(self, static_bricks, check_side):
+        return pygame.sprite.groupcollide(self, static_bricks, False, False, collided=check_side)
+
+    @staticmethod
+    def collided_brick_y(b1, b2):
+        return b1.rect.bottomleft == b2.rect.topleft or b1.rect.bottom >= (TOP_LEFT_Y + PLAY_HEIGHT)
+
+    @staticmethod
+    def collided_brick_x_left(b1, b2):
+        return b1.rect.topleft == b2.rect.topright or b1.rect.left <= TOP_LEFT_X
+
+    @staticmethod
+    def collided_brick_x_right(b1, b2):
+        return b1.rect.topright == b2.rect.topleft or b1.rect.right >= TOP_LEFT_X + PLAY_WIDTH
+
+    def rotate_piece(self, static_bricks, i=1):
+        if i > 4:
+            return
+
+        for brick in self.sprites():
+            brick.rotate()
+
+        if pygame.sprite.groupcollide(self, static_bricks, False, False) or self.check_invalid_terrain():
+            self.rotate_piece(static_bricks, i + 1)
+        else:
+            return
+
+    def soft_drop(self):
+        for b in self.sprites():
+            b.move(0, BRICK_SIZE)
+
+    def hard_drop(self, static_bricks):
+        left_pos_active = dict()
+        for b in self.sprites():
+            if not (b.rect.left in left_pos_active):
+                left_pos_active[b.rect.left] = b.rect.bottom
+            elif left_pos_active[b.rect.left] < b.rect.bottom:
+                left_pos_active[b.rect.left] = b.rect.bottom
+
+        left_pos_static = dict()
+        for b in static_bricks:
+            if not (b.rect.left in left_pos_static):
+                left_pos_static[b.rect.left] = b.rect.top
+            elif left_pos_static[b.rect.left] > b.rect.top:
+                left_pos_static[b.rect.left] = b.rect.top
+
+        diff_vector = []
+        for active in left_pos_active:
+            if active in left_pos_static:
+                diff_vector.append(left_pos_static[active] - left_pos_active[active])
+            else:
+                diff_vector.append(TOP_LEFT_Y + PLAY_HEIGHT - left_pos_active[active])
+
+        drop = min(diff_vector)
+        for b in self.sprites():
+            b.move(0, drop)
+
+        return int(drop / BRICK_SIZE)
+
+    def check_invalid_terrain(self):
+        for brick in self.sprites():
+            if brick.rect.left < TOP_LEFT_X or brick.rect.right > TOP_LEFT_X + PLAY_WIDTH:
+                return True
+
+        return False
+
+
 class Background(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
@@ -91,26 +163,6 @@ class Playfield(pygame.sprite.Sprite):
         self.image = pygame.transform.scale(pygame.transform.rotate(pygame.image.load('img/play3.png'), 90), (PLAY_WIDTH + 55, PLAY_HEIGHT + 52))
         self.surface = pygame.Surface((PLAY_WIDTH + 55, PLAY_HEIGHT + 52))
         self.rect = self.surface.get_rect(topleft=(TOP_LEFT_X - 27, TOP_LEFT_Y - 20))
-
-
-def get_new_piece(pos=(0, 0)):
-    return [Brick(brick, WHITE, pos) for brick in random.choice(shapes_map)]
-
-
-def collision(active_piece, static_bricks, check_side):
-    return pygame.sprite.groupcollide(active_piece, static_bricks, False, False, collided=check_side)
-
-
-def collided_brick_y(b1, b2):
-    return b1.rect.bottomleft == b2.rect.topleft or b1.rect.bottom >= (TOP_LEFT_Y + PLAY_HEIGHT)
-
-
-def collided_brick_x_left(b1, b2):
-    return b1.rect.topleft == b2.rect.topright or b1.rect.left <= TOP_LEFT_X
-
-
-def collided_brick_x_right(b1, b2):
-    return b1.rect.topright == b2.rect.topleft or b1.rect.right >= TOP_LEFT_X + PLAY_WIDTH
 
 
 def create_grid(locked_positions={}):
@@ -163,64 +215,9 @@ def change_piece(active_sprites, static_sprites, all_sprites, next_sprites):
     active_sprites.add(next_piece)
     next_sprites.empty()
 
-    new_piece = get_new_piece(pos=(DISPLAY_INFO_START[0] - START_POINT[0] + 60, DISPLAY_INFO_START[1] - START_POINT[1] + 25))
+    new_piece = Piece(pos=(DISPLAY_INFO_START[0] - START_POINT[0] + 60, DISPLAY_INFO_START[1] - START_POINT[1] + 25))
     next_sprites.add(new_piece)
     all_sprites.add(new_piece)
-
-
-def rotate_piece(active_bricks, static_bricks, i=1):
-    if i > 4:
-        return
-
-    for brick in active_bricks:
-        brick.rotate()
-
-    if pygame.sprite.groupcollide(active_bricks, static_bricks, False, False) or check_invalid_terrain(active_bricks):
-        rotate_piece(active_bricks, static_bricks, i + 1)
-    else:
-        return
-
-
-def soft_drop(active_bricks):
-    for b in active_bricks:
-        b.move(0, BRICK_SIZE)
-
-
-def hard_drop(active_bricks, static_bricks):
-    left_pos_active = dict()
-    for b in active_bricks:
-        if not(b.rect.left in left_pos_active):
-            left_pos_active[b.rect.left] = b.rect.bottom
-        elif left_pos_active[b.rect.left] < b.rect.bottom:
-            left_pos_active[b.rect.left] = b.rect.bottom
-
-    left_pos_static = dict()
-    for b in static_bricks:
-        if not(b.rect.left in left_pos_static):
-            left_pos_static[b.rect.left] = b.rect.top
-        elif left_pos_static[b.rect.left] > b.rect.top:
-            left_pos_static[b.rect.left] = b.rect.top
-
-    diff_vector = []
-    for active in left_pos_active:
-        if active in left_pos_static:
-            diff_vector.append(left_pos_static[active] - left_pos_active[active])
-        else:
-            diff_vector.append(TOP_LEFT_Y + PLAY_HEIGHT - left_pos_active[active])
-
-    drop = min(diff_vector)
-    for b in active_bricks:
-        b.move(0, drop)
-
-    return int(drop/BRICK_SIZE)
-
-
-def check_invalid_terrain(active_bricks):
-    for brick in active_bricks:
-        if brick.rect.left < TOP_LEFT_X or brick.rect.right > TOP_LEFT_X + PLAY_WIDTH:
-            return True
-
-    return False
 
 
 def check_lines(static_bricks):
@@ -254,19 +251,15 @@ def main(win, high_score):
 
     playfield = Playfield()
 
-    active_sprites = pygame.sprite.Group()
     static_sprites = pygame.sprite.Group()
-    next_sprites = pygame.sprite.Group()
     all_sprites = pygame.sprite.Group()
 
-    current_piece = get_new_piece()
-    active_sprites.add(current_piece)
+    current_piece = Piece()
 
-    next_piece = get_new_piece(pos=(DISPLAY_INFO_START[0] - START_POINT[0] + 60, DISPLAY_INFO_START[1] - START_POINT[1] + 25))
-    next_sprites.add(next_piece)
+    next_piece = Piece(pos=(DISPLAY_INFO_START[0] - START_POINT[0] + 60, DISPLAY_INFO_START[1] - START_POINT[1] + 25))
     static_sprites.add(next_piece)
 
-    all_sprites.add(current_piece, next_piece)
+    all_sprites.add(current_piece.sprites(), next_piece.sprites())
 
     soft_drop_active = False
 
@@ -276,11 +269,6 @@ def main(win, high_score):
         level_time += frames.get_rawtime()
         frames.tick(fps)
 
-        if level_time/1000 > 5:
-            level_time = 0
-            if fall_speed > 0.12:
-                fall_speed -= 0.01
-
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
@@ -288,37 +276,35 @@ def main(win, high_score):
                 sys.exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
-                    if not (collision(active_sprites, static_sprites, collided_brick_x_left)):
-                        for brick in active_sprites:
+                    if not (current_piece.collision(static_sprites, Piece.collided_brick_x_left)):
+                        for brick in current_piece:
                             brick.move(-BRICK_SIZE, 0)
                 if event.key == pygame.K_RIGHT:
-                    if not (collision(active_sprites, static_sprites, collided_brick_x_right)):
-                        for brick in active_sprites:
+                    if not (current_piece.collision(static_sprites, Piece.collided_brick_x_right)):
+                        for brick in current_piece:
                             brick.move(BRICK_SIZE, 0)
                 if event.key == pygame.K_DOWN:
                     soft_drop_active = True
                 if event.key == pygame.K_UP:
-                    rotate_piece(active_sprites, static_sprites)
+                    current_piece.rotate_piece(static_sprites)
                 if event.key == pygame.K_SPACE:
-                    droped_lines = hard_drop(active_sprites, static_sprites)
-                    score += droped_lines * 2
+                    dropped_lines = current_piece.hard_drop(static_sprites)
+                    score += dropped_lines * 2
             if event.type == pygame.KEYUP:
                 if event.key == pygame.K_DOWN:
                     soft_drop_active = False
 
         if soft_drop_active:
-            if not (collision(active_sprites, static_sprites, collided_brick_y)):
-                soft_drop(active_sprites)
+            if not (current_piece.collision(static_sprites, Piece.collided_brick_y)):
+                current_piece.soft_drop()
                 score += 1
 
-        if fall_time/1000 > fall_speed:
-            fall_time = 0
-            need_piece = collision(active_sprites, static_sprites, collided_brick_y)
-            if need_piece:
-                change_piece(active_sprites, static_sprites, all_sprites, next_sprites)
-                score += check_lines(static_sprites)
-            else:
-                soft_drop(active_sprites)
+        need_piece = current_piece.collision(static_sprites, Piece.collided_brick_y)
+        if need_piece:
+            change_piece(current_piece, static_sprites, all_sprites, next_piece)
+            score += check_lines(static_sprites)
+        else:
+            current_piece.soft_drop()
 
         draw_window(win, score)
         win.blit(playfield.image, playfield.rect)
