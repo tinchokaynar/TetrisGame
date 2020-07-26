@@ -61,7 +61,7 @@ point_multi = [1, 2, 2, 3, 3, 4, 4, 5]
 class Brick(pygame.sprite.Sprite):
     def __init__(self, shape, color, pos=(0, 0)):
         super().__init__()
-        self.image = pygame.transform.scale(pygame.image.load(f'img/bola.png'), (BRICK_SIZE, BRICK_SIZE))
+        self.image = pygame.transform.scale(pygame.image.load(f'img/{color}'), (BRICK_SIZE, BRICK_SIZE))
         self.surface = pygame.Surface((BRICK_SIZE, BRICK_SIZE))
         self.rot_pos = (shape[0], shape[1])
         self.rect = self.surface.get_rect(topleft=(shape[0] * BRICK_SIZE + START_POINT[0] + pos[0], shape[1] * BRICK_SIZE + START_POINT[1] + pos[1]))
@@ -203,11 +203,12 @@ def check_lost(static_bricks):
 
 
 def draw_text_middle(surface, text, size, color):
-    font = pygame.font.SysFont('Calibri', size, italic=True)
+    image = pygame.transform.scale(pygame.image.load('img/tetris.png'), (600, 216))
+    font = pygame.font.Font('font/Tetris.ttf', 35)
     label = font.render(text, 1, color)
-
-    surface.blit(label,
-                 (TOP_LEFT_X + PLAY_WIDTH/2 - (label.get_width()/2), TOP_LEFT_Y + PLAY_HEIGHT/2 - label.get_height()/2))
+    center = (TOP_LEFT_X + PLAY_WIDTH/2, TOP_LEFT_Y + PLAY_HEIGHT/2)
+    surface.blit(label, (center[0] - (label.get_width()/2), center[1] - label.get_height()/2 + 150))
+    surface.blit(image, (center[0] - (image.get_width()/2), center[1] - image.get_height()/2))
 
 
 def draw_info(surface, total_lines, level, score=0):
