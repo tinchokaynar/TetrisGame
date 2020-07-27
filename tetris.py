@@ -36,11 +36,11 @@ WHITE = (255, 255, 255)
 mat_rot = ([0, -1], [1, 0])
 
 # SHAPES with his Color (Sprite img)
-z_shape = ([(0, 0), (0, -1), (1, -1), (-1, 0)], 'brick_r.png')
+z_shape = ([(0, 0), (0, -1), (1, -1), (-1, 0)], 'brick_r.png', (1, 1))
 
-s_shape = ([(0, 0), (-1, 0), (0, 1), (1, 1)], 'brick_g.png')
+s_shape = ([(0, 0), (-1, 0), (0, 1), (1, 1)], 'brick_g.png', (1, 1))
 
-i_shape = ([(0, 1), (1, 1), (-1, 1), (-2, 1)], 'brick_c.png')
+i_shape = ([(0, 1), (1, 1), (-1, 1), (-2, 1)], 'brick_c.png', (-0.5, 0))
 
 #fixme Probar como gira el cuadrado
 o_shape = ([(0, 0), (-1, 0), (-1, 1), (0, 1)], 'brick_y.png')
@@ -154,10 +154,10 @@ class Piece(pygame.sprite.Group):
 class Background(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        self.image = pygame.transform.scale(pygame.image.load('img/bgtry.png'), (SCREEN_WIDTH, SCREEN_HEIGHT))
+        #self.image = pygame.transform.scale(pygame.image.load('img/bgtry.png'), (SCREEN_WIDTH, SCREEN_HEIGHT))
         self.surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.rect = self.surface.get_rect(topleft=(0, 0))
-        self.surface.fill(WHITE)
+        self.surface.fill(BLACK)
 
 
 class Playfield(pygame.sprite.Sprite):
@@ -348,11 +348,8 @@ def main_menu(win):
     while run:
         win.fill((0, 0, 0))
         bg = Background()
-        win.blit(bg.image, bg.rect)
-        #with open('scores.txt', 'r') as fl:
-        #    lines = fl.readlines()
-        #    high_score = lines[0].strip()
-        draw_text_middle(win, f'Press any key to play.', 50, (255, 255, 255))
+        win.blit(bg.surface, bg.rect)
+        draw_text_middle(win, f'Press any key to play.', 50, WHITE)
         pygame.display.update()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -361,13 +358,6 @@ def main_menu(win):
                 main(win, 0)
     pygame.quit()
     sys.exit()
-
-
-def update_scores(actual_score, score):
-    with open('scores.txt', 'w') as fl:
-        if actual_score > int(score):
-            fl.write(str(actual_score))
-
 
 win = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Tetris')
